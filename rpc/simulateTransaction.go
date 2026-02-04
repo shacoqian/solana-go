@@ -135,3 +135,90 @@ func (cl *Client) SimulateRawTransactionWithOpts(
 	err = cl.rpcClient.CallForInto(ctx, &out, "simulateTransaction", params)
 	return
 }
+
+// AccountBalance represents balance overrides for a single account.
+// Key can be "native" for SOL lamports, or a token mint address for token balance.
+type AccountBalance map[string]uint64
+
+// AccountBalances represents balance overrides for multiple accounts.
+// Key is the account address (base58 encoded).
+type AccountBalances map[string]AccountBalance
+
+// SimulateTransactionOptsEx1 extends SimulateTransactionOpts with additional parameters
+// for the custom simulateTransactionExtV1 RPC method.
+type SimulateTransactionOptsExtV1 struct {
+	// If true the transaction signatures will be verified
+	// (default: false, conflicts with ReplaceRecentBlockhash)
+	SigVerify bool
+
+	// Commitment level to simulate the transaction at.
+	// (default: "finalized").
+	Commitment CommitmentType
+
+	// If true the transaction recent blockhash will be replaced with the most recent blockhash.
+	// (default: false, conflicts with SigVerify)
+	ReplaceRecentBlockhash bool
+
+	Accounts *SimulateTransactionAccountsOpts
+
+	// AccountBalances allows overriding account balances for simulation.
+	// Key is account address, value is a map of balance overrides where:
+	// - "native" key represents SOL lamports balance
+	// - other keys are token mint addresses representing token balances
+	AccountBalances AccountBalances
+}
+
+// SimulateTransactionWithOptsEx1 simulates sending a transaction using the extended
+// simulateTransactionExtV1 RPC method with account balance overrides.
+func (cl *Client) SimulateTransactionWithOptsExtV1(
+	ctx context.Context,
+	transaction *solana.Transaction,
+	opts *SimulateTransactionOptsExtV1,
+) (out *SimulateTransactionResponse, err error) {
+	txData, err := transaction.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("send transaction: encode transaction: %w", err)
+	}
+	return cl.SimulateRawTransactionWithOptsExtV1(ctx, txData, opts)
+}
+
+// SimulateRawTransactionWithOptsEx1 simulates a raw transaction using the extended
+// simulateTransactionExtV1 RPC method with account balance overrides.
+func (cl *Client) SimulateRawTransactionWithOptsExtV1(
+	ctx context.Context,
+	txData []byte,
+	opts *SimulateTransactionOptsExtV1,
+) (out *SimulateTransactionResponse, err error) {
+	obj := M{
+		"encoding": "base64",
+	}
+	if opts != nil {
+		if opts.SigVerify {
+			obj["sigVerify"] = opts.SigVerify
+		}
+		if opts.Commitment != "" {
+			obj["commitment"] = opts.Commitment
+		}
+		if opts.ReplaceRecentBlockhash {
+			obj["replaceRecentBlockhash"] = opts.ReplaceRecentBlockhash
+		}
+		if opts.Accounts != nil {
+			obj["accounts"] = M{
+				"encoding":  opts.Accounts.Encoding,
+				"addresses": opts.Accounts.Addresses,
+			}
+		}
+		if opts.AccountBalances != nil && len(opts.AccountBalances) > 0 {
+			obj["accountBalances"] = opts.AccountBalances
+		}
+	}
+
+	b64Data := base64.StdEncoding.EncodeToString(txData)
+	params := []interface{}{
+		b64Data,
+		obj,
+	}
+
+	err = cl.rpcClient.CallForInto(ctx, &out, "simulateTransactionExtV1", params)
+	return
+}
