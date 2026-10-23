@@ -22,11 +22,20 @@ import (
 	"testing"
 
 	bin "github.com/gagliardetto/binary"
-	"github.com/mr-tron/base58"
+	"github.com/gagliardetto/solana-go/base58"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
+
+// newTestInstruction is a shorthand for creating a testTransactionInstructions.
+func newTestInstruction(programID PublicKey, accounts []*AccountMeta, data []byte) *testTransactionInstructions {
+	return &testTransactionInstructions{
+		accounts:  accounts,
+		data:      data,
+		programID: programID,
+	}
+}
 
 type testTransactionInstructions struct {
 	accounts  []*AccountMeta
@@ -56,7 +65,7 @@ func TestNewTransaction(t *testing.T) {
 				{PublicKey: MustPublicKeyFromBase58("9hFtYBYmBJCVguRYs9pBTWKYAFoKfjYR7zBPpEkVsmD"), IsSigner: true, IsWritable: true},
 			},
 			data:      []byte{0xaa, 0xbb},
-			programID: MustPublicKeyFromBase58("11111111111111111111111111111111"),
+			programID: SystemProgramID,
 		},
 		&testTransactionInstructions{
 			accounts: []*AccountMeta{
@@ -89,20 +98,20 @@ func TestNewTransaction(t *testing.T) {
 		MustPublicKeyFromBase58("9hFtYBYmBJCVguRYs9pBTWKYAFoKfjYR7zBPpEkVsmD"),
 		MustPublicKeyFromBase58("6FzXPEhCJoBx7Zw3SN9qhekHemd6E2b8kVguitmVAngW"),
 		MustPublicKeyFromBase58("SysvarS1otHashes111111111111111111111111111"),
+		SystemProgramID,
 		MustPublicKeyFromBase58("SysvarC1ock11111111111111111111111111111111"),
-		MustPublicKeyFromBase58("11111111111111111111111111111111"),
 		MustPublicKeyFromBase58("Vote111111111111111111111111111111111111111"),
 	})
 
 	assert.Equal(t, trx.Message.Instructions, []CompiledInstruction{
 		{
-			ProgramIDIndex: 5,
+			ProgramIDIndex: 4,
 			Accounts:       []uint16{0, 0o1},
 			Data:           []byte{0xaa, 0xbb},
 		},
 		{
 			ProgramIDIndex: 6,
-			Accounts:       []uint16{4, 3, 1, 2},
+			Accounts:       []uint16{5, 3, 1, 2},
 			Data:           []byte{0xcc, 0xdd},
 		},
 	})
@@ -122,7 +131,7 @@ func TestPartialSignTransaction(t *testing.T) {
 				{PublicKey: signers[2].PublicKey(), IsSigner: true, IsWritable: false},
 			},
 			data:      []byte{0xaa, 0xbb},
-			programID: MustPublicKeyFromBase58("11111111111111111111111111111111"),
+			programID: SystemProgramID,
 		},
 	}
 
@@ -177,7 +186,7 @@ func TestSignTransaction(t *testing.T) {
 				{PublicKey: signers[1].PublicKey(), IsSigner: true, IsWritable: true},
 			},
 			data:      []byte{0xaa, 0xbb},
-			programID: MustPublicKeyFromBase58("11111111111111111111111111111111"),
+			programID: SystemProgramID,
 		},
 	}
 
@@ -245,7 +254,7 @@ func TestTransactionDecode(t *testing.T) {
 		PublicKeySlice{
 			MustPublicKeyFromBase58("52NGrUqh6tSGhr59ajGxsH3VnAaoRdSdTbAaV9G3UW35"),
 			MustPublicKeyFromBase58("SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt"),
-			MustPublicKeyFromBase58("11111111111111111111111111111111"),
+			SystemProgramID,
 		},
 		tx.Message.AccountKeys,
 	)
@@ -329,7 +338,7 @@ func TestTransactionSerializeExisting(t *testing.T) {
 }
 
 func TestTransactionSerializePumpFunSwap(t *testing.T) {
-	expectedEncoded := "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAcMC8/60geEHarnEMtcmE3t7lADNe2/gxa7NAhBe5Ufe5mtEeak/ClEpPqCUb74FUJuG/soxrZkZndgfGrZ9WamRvj7gB4Ax7akKlldX2HW0ZpscDlcG0xgSGrm4qPYLjpXha3ZyoEhdb0urZWzhcxyIVTkHNfJDlRkaaaZumtUuJid6LnvUOa256MT0Ym0MG/y6Uqt2PX3ijrL9vC9eTaGKzqGXmnuD1SAyrz2Y1fk3C8Y1Y1Fwep0ifs3I9l5PHKm6c4nvkyiO9V3lgShoznE+kfvld5CoS4qMMKpnUOErY8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAbd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpBqfVFxksXFEhjMlMPUrxf1ja7gibof1E49vZigAAAACs8TbrAfwcTog9I8i1hEq1mjf2at1XxemsO1PgWdNcZAFW4PaTZlrPRNsVaL8XW6pRicuX9dL/O2VdK7b9bRiw0WlzNBoKArNIcmjqJI0o+XoQGnMjSEA/HZqyYrSJgLkBCwwFAQYCAwQABwgJCgsYZgY9EgHa6+pMR9bEaRkAAHg1HjQAAAAA"
+	expectedEncoded := "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAcMC8/60geEHarnEMtcmE3t7lADNe2/gxa7NAhBe5Ufe5mFrdnKgSF1vS6tlbOFzHIhVOQc18kOVGRpppm6a1S4mJ3oue9Q5rbnoxPRibQwb/LpSq3Y9feKOsv28L15NoYrrRHmpPwpRKT6glG++BVCbhv7KMa2ZGZ3YHxq2fVmpkb4+4AeAMe2pCpZXV9h1tGabHA5XBtMYEhq5uKj2C46VwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVbg9pNmWs9E2xVovxdbqlGJy5f10v87ZV0rtv1tGLAGp9UXGSxcUSGMyUw9SvF/WNruCJuh/UTj29mKAAAAAAbd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpOoZeae4PVIDKvPZjV+TcLxjVjUXB6nSJ+zcj2Xk8cqas8TbrAfwcTog9I8i1hEq1mjf2at1XxemsO1PgWdNcZOnOJ75MojvVd5YEoaM5xPpH75XeQqEuKjDCqZ1DhK2P0WlzNBoKArNIcmjqJI0o+XoQGnMjSEA/HZqyYrSJgLkBBgwJAwsEAQIABQgHCgYYZgY9EgHa6+pMR9bEaRkAAHg1HjQAAAAA"
 	instruction := &testTransactionInstructions{
 		programID: MPK("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"),
 		accounts: []*AccountMeta{
@@ -340,7 +349,7 @@ func TestTransactionSerializePumpFunSwap(t *testing.T) {
 			{PublicKey: MPK("9zpyjwrYdRWNMyqicoiuL3gUcrbvrkd5Kq9nxui1znw1"), IsSigner: false, IsWritable: true},
 			{PublicKey: MPK("BdQqJnuqqFhNZUNYGEEsuhBidpf8qHqfjDQvcjDN3nti"), IsSigner: false, IsWritable: true},
 			{PublicKey: MPK("o7RY6P2vQMuGSu1TrLM81weuzgDjaCRTXYRaXJwWcvc"), IsSigner: true, IsWritable: true},
-			{PublicKey: MPK("11111111111111111111111111111111"), IsSigner: false, IsWritable: false},
+			{PublicKey: SystemProgramID, IsSigner: false, IsWritable: false},
 			{PublicKey: MPK("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"), IsSigner: false, IsWritable: false},
 			{PublicKey: MPK("SysvarRent111111111111111111111111111111111"), IsSigner: false, IsWritable: false},
 			{PublicKey: MPK("Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1"), IsSigner: false, IsWritable: false},
@@ -398,4 +407,574 @@ func BenchmarkTransactionVerifySignatures(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		tx.VerifySignatures()
 	}
+}
+
+// Ported from solana-sdk/transaction/src/lib.rs: test_transaction_serialize.
+// Tests that a transaction survives binary serialization roundtrip.
+func TestTransactionSerializationRoundtrip(t *testing.T) {
+	signers := []PrivateKey{
+		NewWallet().PrivateKey,
+		NewWallet().PrivateKey,
+	}
+	instructions := []Instruction{
+		newTestInstruction(
+			SystemProgramID,
+			[]*AccountMeta{
+				{PublicKey: signers[0].PublicKey(), IsSigner: true, IsWritable: true},
+				{PublicKey: signers[1].PublicKey(), IsSigner: true, IsWritable: false},
+			},
+			[]byte{0x01, 0x02, 0x03},
+		),
+	}
+
+	blockhash, err := HashFromBase58("A9QnpgfhCkmiBSjgBuWk76Wo3HxzxvDopUq9x6UUMmjn")
+	require.NoError(t, err)
+
+	tx, err := NewTransaction(instructions, blockhash)
+	require.NoError(t, err)
+
+	_, err = tx.Sign(func(key PublicKey) *PrivateKey {
+		for _, signer := range signers {
+			if key.Equals(signer.PublicKey()) {
+				return &signer
+			}
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	// Marshal to binary.
+	data, err := tx.MarshalBinary()
+	require.NoError(t, err)
+
+	// Unmarshal back.
+	var decoded Transaction
+	err = decoded.UnmarshalWithDecoder(bin.NewBinDecoder(data))
+	require.NoError(t, err)
+
+	// Compare.
+	assert.Equal(t, tx.Signatures, decoded.Signatures)
+	assert.Equal(t, tx.Message.Header, decoded.Message.Header)
+	assert.Equal(t, tx.Message.AccountKeys, decoded.Message.AccountKeys)
+	assert.Equal(t, tx.Message.RecentBlockhash, decoded.Message.RecentBlockhash)
+	require.Equal(t, len(tx.Message.Instructions), len(decoded.Message.Instructions))
+	for i := range tx.Message.Instructions {
+		assert.Equal(t, tx.Message.Instructions[i].ProgramIDIndex, decoded.Message.Instructions[i].ProgramIDIndex)
+		assert.Equal(t, tx.Message.Instructions[i].Accounts, decoded.Message.Instructions[i].Accounts)
+	}
+
+	// Verify signatures still valid after roundtrip.
+	require.NoError(t, decoded.VerifySignatures())
+}
+
+// Ported from solana-sdk/transaction/src/lib.rs: test_sanitize_txs.
+// Tests that signature count must match num_required_signatures.
+func TestVerifySignatures_SignatureCountMismatch(t *testing.T) {
+	signer := NewWallet().PrivateKey
+
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(
+			SystemProgramID,
+			[]*AccountMeta{{PublicKey: signer.PublicKey(), IsSigner: true, IsWritable: true}},
+			[]byte{0x01},
+		),
+	}, Hash{1, 2, 3})
+	require.NoError(t, err)
+
+	_, err = tx.Sign(func(key PublicKey) *PrivateKey {
+		if key.Equals(signer.PublicKey()) {
+			return &signer
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.NoError(t, tx.VerifySignatures())
+
+	// Too many signatures.
+	tx.Signatures = append(tx.Signatures, tx.Signatures[0])
+	err = tx.VerifySignatures()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "signers")
+
+	// Too few signatures.
+	tx.Signatures = nil
+	err = tx.VerifySignatures()
+	require.Error(t, err)
+}
+
+// Ported from solana-sdk/transaction/src/lib.rs: test_transaction_instruction_with_duplicate_keys.
+// Tests that duplicate account keys in instructions are deduplicated.
+func TestNewTransaction_DuplicateAccountKeys(t *testing.T) {
+	key := newUniqueKey()
+
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(
+			SystemProgramID,
+			[]*AccountMeta{
+				{PublicKey: key, IsSigner: true, IsWritable: true},
+				{PublicKey: key, IsSigner: true, IsWritable: true}, // duplicate
+			},
+			[]byte{0x01},
+		),
+	}, Hash{})
+	require.NoError(t, err)
+
+	// The duplicate should be deduplicated in AccountKeys.
+	// Should have: key (payer/signer) + system program = 2 keys.
+	assert.Equal(t, 2, len(tx.Message.AccountKeys))
+	assert.Equal(t, uint8(1), tx.Message.Header.NumRequiredSignatures)
+}
+
+// Ported from solana-sdk/transaction/src/lib.rs: test_transaction_correct_key.
+// Tests that signing with the correct key produces verifiable signatures.
+func TestTransaction_SignAndVerify(t *testing.T) {
+	signer := NewWallet().PrivateKey
+
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(
+			SystemProgramID,
+			[]*AccountMeta{{PublicKey: signer.PublicKey(), IsSigner: true, IsWritable: true}},
+			[]byte{0xDE, 0xAD},
+		),
+	}, Hash{42})
+	require.NoError(t, err)
+
+	_, err = tx.Sign(func(key PublicKey) *PrivateKey {
+		if key.Equals(signer.PublicKey()) {
+			return &signer
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	// Valid signature.
+	require.NoError(t, tx.VerifySignatures())
+
+	// Tamper with the signature -> should fail.
+	tx.Signatures[0][0] ^= 0xFF
+	err = tx.VerifySignatures()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid signature")
+}
+
+// Tests that NewTransaction requires at least one instruction.
+func TestNewTransaction_EmptyInstructions(t *testing.T) {
+	_, err := NewTransaction(nil, Hash{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "requires at-least one instruction")
+
+	_, err = NewTransaction([]Instruction{}, Hash{})
+	require.Error(t, err)
+}
+
+// Tests TransactionBuilder.
+func TestTransactionBuilder(t *testing.T) {
+	signer := NewWallet().PrivateKey
+	programID := SystemProgramID
+	blockhash := Hash{1, 2, 3}
+
+	tx, err := NewTransactionBuilder().
+		AddInstruction(newTestInstruction(
+			programID,
+			[]*AccountMeta{{PublicKey: signer.PublicKey(), IsSigner: true, IsWritable: true}},
+			[]byte{0x01},
+		)).
+		SetRecentBlockHash(blockhash).
+		SetFeePayer(signer.PublicKey()).
+		Build()
+	require.NoError(t, err)
+
+	assert.Equal(t, blockhash, tx.Message.RecentBlockhash)
+	assert.Equal(t, uint8(1), tx.Message.Header.NumRequiredSignatures)
+	assert.Equal(t, signer.PublicKey(), tx.Message.AccountKeys[0])
+}
+
+// Tests NumWriteableAccounts, NumReadonlyAccounts, NumSigners for legacy transactions.
+// Ported from solana-sdk/transaction/src/lib.rs header validation tests.
+func TestTransaction_AccountCounts_Legacy(t *testing.T) {
+	keys := [5]PublicKey{}
+	for i := range keys {
+		keys[i] = newUniqueKey()
+	}
+
+	// 2 signers (1 writable, 1 readonly), 3 unsigned (1 writable, 2 readonly)
+	// -> header: 2 required, 1 readonly_signed, 2 readonly_unsigned
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(
+			keys[4],
+			[]*AccountMeta{
+				{PublicKey: keys[0], IsSigner: true, IsWritable: true},
+				{PublicKey: keys[1], IsSigner: true, IsWritable: false},
+				{PublicKey: keys[2], IsSigner: false, IsWritable: true},
+				{PublicKey: keys[3], IsSigner: false, IsWritable: false},
+			},
+			[]byte{0x01},
+		),
+	}, Hash{}, TransactionPayer(keys[0]))
+	require.NoError(t, err)
+
+	assert.Equal(t, uint8(2), tx.Message.Header.NumRequiredSignatures)
+	assert.Equal(t, uint8(1), tx.Message.Header.NumReadonlySignedAccounts)
+	// keys[3] (readonly unsigned) + keys[4] (program, readonly unsigned) = 2
+	assert.Equal(t, uint8(2), tx.Message.Header.NumReadonlyUnsignedAccounts)
+
+	assert.Equal(t, 2, tx.NumSigners())
+	assert.Equal(t, 3, tx.NumReadonlyAccounts())  // 1 readonly signed + 2 readonly unsigned
+	assert.Equal(t, 2, tx.NumWriteableAccounts()) // keys[0] writable signer + keys[2] writable unsigned
+}
+
+// Tests GetProgramIDs.
+func TestTransaction_GetProgramIDs(t *testing.T) {
+	prog1 := newUniqueKey()
+	prog2 := newUniqueKey()
+	signer := newUniqueKey()
+
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(prog1, []*AccountMeta{{PublicKey: signer, IsSigner: true, IsWritable: true}}, []byte{0x01}),
+		newTestInstruction(prog2, []*AccountMeta{{PublicKey: signer, IsSigner: false, IsWritable: false}}, []byte{0x02}),
+	}, Hash{}, TransactionPayer(signer))
+	require.NoError(t, err)
+
+	programIDs, err := tx.GetProgramIDs()
+	require.NoError(t, err)
+	require.Equal(t, 2, len(programIDs))
+
+	// Verify both programs are present.
+	found := map[PublicKey]bool{}
+	for _, pid := range programIDs {
+		found[pid] = true
+	}
+	assert.True(t, found[prog1], "prog1 should be in program IDs")
+	assert.True(t, found[prog2], "prog2 should be in program IDs")
+}
+
+// Tests IsVote.
+func TestTransaction_IsVote(t *testing.T) {
+	signer := newUniqueKey()
+	t.Run("non-vote transaction", func(t *testing.T) {
+		tx, err := NewTransaction([]Instruction{
+			newTestInstruction(SystemProgramID, []*AccountMeta{{PublicKey: signer, IsSigner: true, IsWritable: true}}, []byte{0x01}),
+		}, Hash{}, TransactionPayer(signer))
+		require.NoError(t, err)
+		assert.False(t, tx.IsVote())
+	})
+
+	t.Run("vote transaction", func(t *testing.T) {
+		tx, err := NewTransaction([]Instruction{
+			newTestInstruction(VoteProgramID, []*AccountMeta{{PublicKey: signer, IsSigner: true, IsWritable: true}}, []byte{0x01}),
+		}, Hash{}, TransactionPayer(signer))
+		require.NoError(t, err)
+		assert.True(t, tx.IsVote())
+	})
+}
+
+// Tests HasAccount, IsSigner, IsWritable on Transaction.
+func TestTransaction_AccountQueries(t *testing.T) {
+	signer := newUniqueKey()
+	writable := newUniqueKey()
+	readonly := newUniqueKey()
+	programID := SystemProgramID
+
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(programID, []*AccountMeta{
+			{PublicKey: signer, IsSigner: true, IsWritable: true},
+			{PublicKey: writable, IsSigner: false, IsWritable: true},
+			{PublicKey: readonly, IsSigner: false, IsWritable: false},
+		}, []byte{0x01}),
+	}, Hash{}, TransactionPayer(signer))
+	require.NoError(t, err)
+
+	// HasAccount.
+	has, err := tx.HasAccount(signer)
+	require.NoError(t, err)
+	assert.True(t, has)
+
+	has, err = tx.HasAccount(newUniqueKey())
+	require.NoError(t, err)
+	assert.False(t, has)
+
+	// IsSigner.
+	assert.True(t, tx.IsSigner(signer))
+	assert.False(t, tx.IsSigner(writable))
+	assert.False(t, tx.IsSigner(readonly))
+
+	// IsWritable.
+	w, err := tx.IsWritable(signer)
+	require.NoError(t, err)
+	assert.True(t, w, "signer should be writable")
+
+	w, err = tx.IsWritable(writable)
+	require.NoError(t, err)
+	assert.True(t, w, "writable account should be writable")
+
+	w, err = tx.IsWritable(readonly)
+	require.NoError(t, err)
+	assert.False(t, w, "readonly account should not be writable")
+}
+
+// Tests that MarshalBinary pads missing signatures with zeroes.
+// Ported from solana-web3.js reference in the Go code comment.
+func TestMarshalBinary_PadsMissingSignatures(t *testing.T) {
+	signer := newUniqueKey()
+
+	tx := &Transaction{
+		Message: Message{
+			Header: MessageHeader{
+				NumRequiredSignatures:       2,
+				NumReadonlySignedAccounts:   0,
+				NumReadonlyUnsignedAccounts: 1,
+			},
+			AccountKeys: PublicKeySlice{
+				signer,
+				newUniqueKey(),
+				SystemProgramID,
+			},
+			RecentBlockhash: Hash{1},
+			Instructions: []CompiledInstruction{
+				{ProgramIDIndex: 2, Accounts: []uint16{0, 1}, Data: []byte{0x01}},
+			},
+		},
+		// Only 0 signatures provided, but 2 required.
+		Signatures: nil,
+	}
+
+	data, err := tx.MarshalBinary()
+	require.NoError(t, err)
+
+	// Decode and check that 2 dummy signatures were added.
+	var decoded Transaction
+	err = decoded.UnmarshalWithDecoder(bin.NewBinDecoder(data))
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(decoded.Signatures))
+	// Both should be zero-filled.
+	assert.Equal(t, Signature{}, decoded.Signatures[0])
+	assert.Equal(t, Signature{}, decoded.Signatures[1])
+}
+
+// Tests base64 roundtrip on Transaction.
+func TestTransaction_Base64Roundtrip(t *testing.T) {
+	signer := NewWallet().PrivateKey
+
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(
+			SystemProgramID,
+			[]*AccountMeta{{PublicKey: signer.PublicKey(), IsSigner: true, IsWritable: true}},
+			[]byte{0xCA, 0xFE},
+		),
+	}, Hash{99}, TransactionPayer(signer.PublicKey()))
+	require.NoError(t, err)
+
+	_, err = tx.Sign(func(key PublicKey) *PrivateKey {
+		if key.Equals(signer.PublicKey()) {
+			return &signer
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	b64, err := tx.ToBase64()
+	require.NoError(t, err)
+	require.NotEmpty(t, b64)
+
+	decoded, err := TransactionFromBase64(b64)
+	require.NoError(t, err)
+	require.NoError(t, decoded.VerifySignatures())
+
+	assert.Equal(t, tx.Signatures, decoded.Signatures)
+	assert.Equal(t, tx.Message.Header, decoded.Message.Header)
+	assert.Equal(t, tx.Message.AccountKeys, decoded.Message.AccountKeys)
+}
+
+// Tests TransactionFromBytes and TransactionFromBase58.
+func TestTransaction_FromVariousFormats(t *testing.T) {
+	// Use a known valid transaction.
+	b64 := "AfjEs3XhTc3hrxEvlnMPkm/cocvAUbFNbCl00qKnrFue6J53AhEqIFmcJJlJW3EDP5RmcMz+cNTTcZHW/WJYwAcBAAEDO8hh4VddzfcO5jbCt95jryl6y8ff65UcgukHNLWH+UQGgxCGGpgyfQVQV02EQYqm4QwzUt2qf9f1gVLM7rI4hwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA6ANIF55zOZWROWRkeh+lExxZBnKFqbvIxZDLE7EijjoBAgIAAQwCAAAAOTAAAAAAAAA="
+	data, err := base64.StdEncoding.DecodeString(b64)
+	require.NoError(t, err)
+
+	// FromBytes.
+	tx1, err := TransactionFromBytes(data)
+	require.NoError(t, err)
+	require.NotNil(t, tx1)
+	require.NoError(t, tx1.VerifySignatures())
+
+	// FromBase64.
+	tx2, err := TransactionFromBase64(b64)
+	require.NoError(t, err)
+	require.NotNil(t, tx2)
+	assert.Equal(t, tx1.Signatures, tx2.Signatures)
+	assert.Equal(t, tx1.Message.Header, tx2.Message.Header)
+}
+
+// Tests Transaction.String() doesn't panic (EncodeToTree coverage).
+func TestTransaction_String_NoPanic(t *testing.T) {
+	signer := NewWallet().PrivateKey
+
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(
+			SystemProgramID,
+			[]*AccountMeta{{PublicKey: signer.PublicKey(), IsSigner: true, IsWritable: true}},
+			[]byte{0x01},
+		),
+	}, Hash{}, TransactionPayer(signer.PublicKey()))
+	require.NoError(t, err)
+
+	_, err = tx.Sign(func(key PublicKey) *PrivateKey {
+		if key.Equals(signer.PublicKey()) {
+			return &signer
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	require.NotPanics(t, func() {
+		s := tx.String()
+		assert.NotEmpty(t, s)
+	})
+}
+
+// Tests that fee payer is always first in account keys.
+// Ported from solana-sdk/transaction/src/lib.rs: test_message_payer_first.
+func TestNewTransaction_FeePayerFirst(t *testing.T) {
+	payer := newUniqueKey()
+	other := newUniqueKey()
+	programID := SystemProgramID
+
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(programID, []*AccountMeta{{PublicKey: other, IsSigner: true, IsWritable: true}}, []byte{0x01}),
+	}, Hash{}, TransactionPayer(payer))
+	require.NoError(t, err)
+
+	// Fee payer must be first.
+	assert.Equal(t, payer, tx.Message.AccountKeys[0])
+	// Fee payer is always a writable signer.
+	assert.True(t, tx.IsSigner(payer))
+	w, err := tx.IsWritable(payer)
+	require.NoError(t, err)
+	assert.True(t, w)
+}
+
+// Tests NumWriteableAccounts for V0 transactions with address table lookups.
+func TestTransaction_NumWriteableAccounts_V0(t *testing.T) {
+	payer := newUniqueKey()
+	programID := newUniqueKey()
+	acctA := newUniqueKey()
+	acctB := newUniqueKey()
+	tableKey := newUniqueKey()
+
+	tables := map[PublicKey]PublicKeySlice{
+		tableKey: {acctA, acctB},
+	}
+
+	tx, err := NewTransaction(
+		[]Instruction{
+			newTestInstruction(programID, []*AccountMeta{
+				{PublicKey: acctA, IsSigner: false, IsWritable: true},
+				{PublicKey: acctB, IsSigner: false, IsWritable: false},
+			}, []byte{0x01}),
+		},
+		Hash{},
+		TransactionPayer(payer),
+		TransactionAddressTables(tables),
+	)
+	require.NoError(t, err)
+	require.True(t, tx.Message.IsVersioned())
+
+	// payer (writable signer) + acctA (writable lookup) = 2 writable
+	assert.Equal(t, 2, tx.NumWriteableAccounts())
+}
+
+// Tests NumWriteableAccounts for a RESOLVED V0 transaction whose lookup table
+// contributes a readonly account: the readonly lookup account must not be
+// counted as writable.
+func TestTransaction_NumWriteableAccounts_V0_Resolved(t *testing.T) {
+	payer := newUniqueKey()
+	programID := newUniqueKey()
+	acctA := newUniqueKey() // writable lookup
+	acctB := newUniqueKey() // readonly lookup
+	tableKey := newUniqueKey()
+
+	tables := map[PublicKey]PublicKeySlice{
+		tableKey: {acctA, acctB},
+	}
+
+	tx, err := NewTransaction(
+		[]Instruction{
+			newTestInstruction(programID, []*AccountMeta{
+				{PublicKey: acctA, IsSigner: false, IsWritable: true},
+				{PublicKey: acctB, IsSigner: false, IsWritable: false},
+			}, []byte{0x01}),
+		},
+		Hash{},
+		TransactionPayer(payer),
+		TransactionAddressTables(tables),
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, tx.Message.ResolveLookups())
+	require.True(t, tx.Message.IsResolved())
+
+	// payer (writable signer) + acctA (writable lookup) = 2; acctB (readonly lookup) must not count
+	assert.Equal(t, 2, tx.NumWriteableAccounts())
+}
+
+// Tests PartialSign with no signer provided doesn't corrupt state.
+func TestPartialSign_NoSignerProvided(t *testing.T) {
+	signer := NewWallet().PrivateKey
+
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(
+			SystemProgramID,
+			[]*AccountMeta{{PublicKey: signer.PublicKey(), IsSigner: true, IsWritable: true}},
+			[]byte{0x01},
+		),
+	}, Hash{}, TransactionPayer(signer.PublicKey()))
+	require.NoError(t, err)
+
+	// PartialSign with no matching key — should succeed but leave signature as zero.
+	sigs, err := tx.PartialSign(func(key PublicKey) *PrivateKey {
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(sigs))
+	assert.Equal(t, Signature{}, sigs[0])
+}
+
+// Tests that multiple instructions with the same program ID are handled correctly.
+func TestNewTransaction_MultipleInstructionsSameProgram(t *testing.T) {
+	signer := newUniqueKey()
+	target := newUniqueKey()
+	programID := SystemProgramID
+
+	tx, err := NewTransaction([]Instruction{
+		newTestInstruction(programID, []*AccountMeta{
+			{PublicKey: signer, IsSigner: true, IsWritable: true},
+			{PublicKey: target, IsSigner: false, IsWritable: true},
+		}, []byte{0x01}),
+		newTestInstruction(programID, []*AccountMeta{
+			{PublicKey: signer, IsSigner: true, IsWritable: true},
+			{PublicKey: target, IsSigner: false, IsWritable: true},
+		}, []byte{0x02}),
+	}, Hash{}, TransactionPayer(signer))
+	require.NoError(t, err)
+
+	// Program should appear only once in AccountKeys despite being used in 2 instructions.
+	programCount := 0
+	for _, key := range tx.Message.AccountKeys {
+		if key.Equals(programID) {
+			programCount++
+		}
+	}
+	assert.Equal(t, 1, programCount, "program should appear only once")
+
+	// Both instructions should reference the same program index.
+	assert.Equal(t, tx.Message.Instructions[0].ProgramIDIndex, tx.Message.Instructions[1].ProgramIDIndex)
+	assert.Equal(t, 2, len(tx.Message.Instructions))
+}
+
+// Tests nil transaction edge cases for count functions.
+func TestTransaction_NilCounts(t *testing.T) {
+	assert.Equal(t, -1, countSigners(nil))
+	assert.Equal(t, -1, countReadonlyAccounts(nil))
+	assert.Equal(t, -1, countWriteableAccounts(nil))
 }

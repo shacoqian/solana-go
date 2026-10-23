@@ -15,6 +15,7 @@
 package associatedtokenaccount
 
 import (
+	"bytes"
 	"fmt"
 
 	spew "github.com/davecgh/go-spew/spew"
@@ -26,15 +27,44 @@ import (
 
 var ProgramID solana.PublicKey = solana.SPLAssociatedTokenAccountProgramID
 
-func SetProgramID(pubkey solana.PublicKey) {
+func SetProgramID(pubkey solana.PublicKey) error {
 	ProgramID = pubkey
-	solana.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
+	return solana.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
 }
 
 const ProgramName = "AssociatedTokenAccount"
 
 func init() {
-	solana.RegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
+	solana.MustRegisterInstructionDecoder(ProgramID, registryDecodeInstruction)
+}
+
+const (
+	// Creates an associated token account for the given wallet address and token mint.
+	// Returns an error if the account exists.
+	Instruction_Create uint8 = iota
+
+	// Creates an associated token account for the given wallet address and token mint,
+	// if it doesn't already exist. Returns an error if the account exists, but with
+	// a different owner.
+	Instruction_CreateIdempotent
+
+	// Transfers tokens from and closes a nested associated token account: an
+	// associated token account owned by an associated token account.
+	Instruction_RecoverNested
+)
+
+// InstructionIDToName returns the name of the instruction given its ID.
+func InstructionIDToName(id uint8) string {
+	switch id {
+	case Instruction_Create:
+		return "Create"
+	case Instruction_CreateIdempotent:
+		return "CreateIdempotent"
+	case Instruction_RecoverNested:
+		return "RecoverNested"
+	default:
+		return ""
+	}
 }
 
 type Instruction struct {
@@ -50,11 +80,11 @@ func (inst *Instruction) EncodeToTree(parent treeout.Branches) {
 }
 
 var InstructionImplDef = bin.NewVariantDefinition(
-	bin.NoTypeIDEncoding, // NOTE: the associated-token-account program has no ID encoding.
+	bin.Uint8TypeIDEncoding,
 	[]bin.VariantType{
-		{
-			"Create", (*Create)(nil),
-		},
+		{Name: "Create", Type: (*Create)(nil)},
+		{Name: "CreateIdempotent", Type: (*CreateIdempotent)(nil)},
+		{Name: "RecoverNested", Type: (*RecoverNested)(nil)},
 	},
 )
 
@@ -67,7 +97,11 @@ func (inst *Instruction) Accounts() (out []*solana.AccountMeta) {
 }
 
 func (inst *Instruction) Data() ([]byte, error) {
-	return []byte{}, nil
+	buf := new(bytes.Buffer)
+	if err := bin.NewBinEncoder(buf).Encode(inst); err != nil {
+		return nil, fmt.Errorf("unable to encode instruction: %w", err)
+	}
+	return buf.Bytes(), nil
 }
 
 func (inst *Instruction) TextEncode(encoder *text.Encoder, option *text.Option) error {
@@ -79,10 +113,14 @@ func (inst *Instruction) UnmarshalWithDecoder(decoder *bin.Decoder) error {
 }
 
 func (inst Instruction) MarshalWithEncoder(encoder *bin.Encoder) error {
+	err := encoder.WriteUint8(inst.TypeID.Uint8())
+	if err != nil {
+		return fmt.Errorf("unable to write variant type: %w", err)
+	}
 	return encoder.Encode(inst.Impl)
 }
 
-func registryDecodeInstruction(accounts []*solana.AccountMeta, data []byte) (interface{}, error) {
+func registryDecodeInstruction(accounts []*solana.AccountMeta, data []byte) (any, error) {
 	inst, err := DecodeInstruction(accounts, data)
 	if err != nil {
 		return nil, err
@@ -92,6 +130,10 @@ func registryDecodeInstruction(accounts []*solana.AccountMeta, data []byte) (int
 
 func DecodeInstruction(accounts []*solana.AccountMeta, data []byte) (*Instruction, error) {
 	inst := new(Instruction)
+	// Backward compatibility: empty data is a legacy Create instruction.
+	if len(data) == 0 {
+		data = []byte{Instruction_Create}
+	}
 	if err := bin.NewBinDecoder(data).Decode(inst); err != nil {
 		return nil, fmt.Errorf("unable to decode instruction: %w", err)
 	}
